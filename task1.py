@@ -1,13 +1,4 @@
-""""
-Aggregate (user, song) interactions and binarize with a >=2 threshold.
-Simply run:
-    python task1.py
-Expected input file:
-    listening_history.csv
-Output files:
-    counts.csv                — all user-song counts
-    interactions_binarized.csv — only pairs with count >=2 (label=5)
-"""
+
 
 import pandas as pd
 from pathlib import Path
@@ -23,7 +14,7 @@ def main():
         print(f"Input file not found: {in_path}")
         return
 
-    # Read CSV — auto-detect separator (comma, tab, semicolon)
+    # Read CSV
     df = pd.read_csv(in_path, sep=None, engine="python", dtype=str)
     if df.empty:
         print("Input file is empty — nothing to process.")
@@ -34,7 +25,7 @@ def main():
     user_col = cols.get("user") or list(df.columns)[0]
     item_col = cols.get("song") or cols.get("item") or list(df.columns)[1]
 
-    # Keep only user and song columns
+    # Keeping only user and song columns
     work = df[[user_col, item_col]].rename(columns={user_col: "user", item_col: "song"}).dropna()
 
     # Count interactions
