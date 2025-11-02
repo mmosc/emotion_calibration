@@ -16,4 +16,4 @@ df.reset_index(inplace=True)
 result_df = df[['id', 'highest_gem']]
 
 # Save the result to a new tsv file
-result_df.to_csv('C:\\Users\\Emra\\Desktop\\PR2\\id_highest_gems.tsv', sep='\t', index=False)
+result_df.to_csv('C:\\Users\\Emra\\Desktop\\PR\\id_highest_gems.tsv', sep='\t', index=False)
