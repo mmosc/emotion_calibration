@@ -12,7 +12,7 @@ def main():
 
 
     # Load the pre-trained BPR model and associated data
-    model_path = r"saved\BPR-Oct-22-2025_11-00-51.pth"
+    model_path = r"saved\ItemKNN-Nov-16-2025_20-42-36.pth"
     config, model, dataset, train_data, valid_data, test_data = load_data_and_model(model_path)
 
     # Set up device (GPU if available, else CPU) and put model in evaluation mode
