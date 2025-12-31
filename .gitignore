@@ -3,3 +3,10 @@ listening_history.csv
 interactions_binarized.csv
 counts.csv
 user_top100.tsv
+
+# Generated outputs and large data
+outputs/
+data/
+*.pth
+*.zip
+large_files.txt

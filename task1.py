@@ -1,12 +1,12 @@
-
-
 import pandas as pd
 from pathlib import Path
 
-# === File paths ===
-INPUT_FILE = "listening_history.csv"
-COUNTS_FILE = "counts.csv"
-OUTPUT_FILE = "interactions_binarized.csv"
+# === CONFIG ===
+INPUT_FILE = "data/listening_history.csv"
+COUNTS_FILE = "outputs/01_preprocessing/counts.csv"
+OUTPUT_FILE = "outputs/01_preprocessing/interactions_binarized.csv"
+
+IMPLICIT_FEEDBACK_SCORE = 5  # Score assigned to filtered interactions
 
 def main():
     in_path = Path(INPUT_FILE)
@@ -46,7 +46,7 @@ def main():
         filtered[["user", "song"]] = []
     else:
         filtered = filtered.drop(columns=["count"])
-        filtered["label"] = 5  # assign label 5
+        filtered["label"] = IMPLICIT_FEEDBACK_SCORE
 
     # Save binarized output
     filtered.to_csv(OUTPUT_FILE, index=False)

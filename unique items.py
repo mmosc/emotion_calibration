@@ -1,9 +1,8 @@
 import pandas as pd
 
 # Load data
-inter = pd.read_csv("interactions_binarized.csv")
-gems = pd.read_csv("id_highest_gems.tsv", sep="\t")
-
+inter = pd.read_csv("outputs/01_preprocessing/interactions_binarized.csv")
+gems = pd.read_csv("data/id_highest_gems.tsv", sep="\t")
 
 gems = gems.rename(columns={"id": "song", "highest_gem": "emotion"})
 
@@ -19,5 +18,4 @@ stats = {
 df_stats = pd.DataFrame(stats, index=[0])
 
 print(df_stats)
-df_stats.to_csv("dataset_summary.csv", index=False)
-
+df_stats.to_csv("outputs/04_evaluation/dataset_summary.csv", index=False)
