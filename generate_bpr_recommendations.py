@@ -52,9 +52,17 @@ def main():
     # ----------------------
     # 2. Generate top-100 recommendations
     # ----------------------
+    # ----------------------
+    # 2. Generate top-100 recommendations
+    # ----------------------
     print(f"Generating recommendations for {user_num} users...")
     
-    for uid in range(user_num):
+    # RecBole reserves ID 0 for padding. Valid users start from 1.
+    valid_uids = list(range(1, user_num))
+    
+    all_user_items = []
+
+    for uid in valid_uids:
         u_tensor = torch.tensor([uid], device=device)
         interaction = Interaction({user_field: u_tensor}).to(device)
         scores = model.full_sort_predict(interaction)
@@ -65,22 +73,30 @@ def main():
         _, topk_idx = torch.topk(scores, k=k, dim=1)
         all_user_items.append(topk_idx.cpu())
 
-        if (uid + 1) % 500 == 0:
-            print(f"Processed {uid + 1}/{user_num} users")
+        if uid % 500 == 0:
+            print(f"Processed {uid}/{user_num} users")
 
     topk_indices = torch.cat(all_user_items, dim=0)
 
     # ----------------------
     # 3. Convert internal → external IDs
     # ----------------------
-    user_tokens = dataset.id2token(user_field, list(range(user_num)))
+    user_tokens = dataset.id2token(user_field, valid_uids)
     item_tokens = dataset.id2token(item_field, topk_indices)
+    
+    # Debug print
+    print(f"Sample User Token: {user_tokens[0]}")
+    print(f"Sample Item Tokens (Row 0): {item_tokens[0]}")
 
     rows = []
-    for user_tok, items in zip(user_tokens, item_tokens.tolist()):
+    for user_tok, items in zip(user_tokens, item_tokens):
+        # items might be numpy array or list
+        if hasattr(items, "tolist"):
+             items = items.tolist()
+        
         rows.append({
             "user_id": user_tok,
-            "recommended_items": ",".join(items)
+            "recommended_items": ",".join(map(str, items))
         })
 
     # ----------------------

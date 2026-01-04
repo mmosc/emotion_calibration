@@ -24,7 +24,9 @@ This project extends standard evaluation by incorporating emotion-aware calibrat
 
 ### 2.2 Interaction Binarization
 - Converted play counts into implicit feedback.
-- Kept only (user, song) pairs with **≥ 2 listens** to remove noise.
+- **Workflow**:
+    1. Kept only (user, song) pairs with **≥ 2 listens** to remove initial noise.
+    2. Applied **5-core filtering** (iteratively removed users and songs with < 5 interactions).
 - Assigned a fixed implicit feedback label (`label = 5`, compatible with RecBole).
 - **Output file**: `outputs/01_preprocessing/interactions_binarized.csv`
 

@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 # Define input and output file paths
-input_csv_path = "C:\\Users\\Emra\\Desktop\\PR\\interactions_binarized.csv"
+input_csv_path = "C:\\Users\\Emra\\Desktop\\PR\\outputs\\01_preprocessing\\interactions_binarized.csv"
 output_inter_path = "C:\\Users\\Emra\\Desktop\\PR\\CaliTune\\data\\my_dataset\\my_dataset.inter"
 
 # Read the CSV file

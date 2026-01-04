@@ -8,6 +8,27 @@ OUTPUT_FILE = "outputs/01_preprocessing/interactions_binarized.csv"
 
 IMPLICIT_FEEDBACK_SCORE = 5  # Score assigned to filtered interactions
 
+def filter_k_core(df, k=5):
+    """
+    Iteratively filters users and items with fewer than k interactions.
+    """
+    print(f"Applying {k}-core filtering...")
+    while True:
+        prev_size = len(df)
+        
+        # Filter items
+        item_counts = df.groupby("song").size()
+        df = df[df["song"].isin(item_counts[item_counts >= k].index)]
+        
+        # Filter users
+        user_counts = df.groupby("user").size()
+        df = df[df["user"].isin(user_counts[user_counts >= k].index)]
+        
+        if len(df) == prev_size:
+            break
+            
+    return df
+
 def main():
     in_path = Path(INPUT_FILE)
     if not in_path.exists():
@@ -28,29 +49,32 @@ def main():
     # Keeping only user and song columns
     work = df[[user_col, item_col]].rename(columns={user_col: "user", item_col: "song"}).dropna()
 
-    # Count interactions
+    # Count interactions (to handle noise reduction first)
     counts = (
         work.groupby(["user", "song"], as_index=False)
             .size()
             .rename(columns={"size": "count"})
     )
 
-    # Save all counts
+    # Save all raw counts for reference
     counts.to_csv(COUNTS_FILE, index=False)
-    print(f"Saved counts to {COUNTS_FILE} ({len(counts)} rows)")
+    print(f"Saved raw counts to {COUNTS_FILE} ({len(counts)} rows)")
 
-    # Filter where count >= 2
+    # 1. Noise reduction: Keep only (user, song) with >= 2 total listens
     filtered = counts[counts["count"] >= 2].copy()
+    
+    # 2. Apply 5-core filtering on the resulting unique interactions
+    filtered = filter_k_core(filtered, k=5)
+
     if filtered.empty:
-        print("No (user, song) pairs with count >= 2 found.")
-        filtered[["user", "song"]] = []
+        print("No interactions left after 5-core filtering.")
     else:
         filtered = filtered.drop(columns=["count"])
         filtered["label"] = IMPLICIT_FEEDBACK_SCORE
 
     # Save binarized output
     filtered.to_csv(OUTPUT_FILE, index=False)
-    print(f"Saved binarized interactions to {OUTPUT_FILE} ({len(filtered)} rows)")
+    print(f"Saved 5-core binarized interactions to {OUTPUT_FILE} ({len(filtered)} rows)")
 
 if __name__ == "__main__":
     main()

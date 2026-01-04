@@ -50,8 +50,7 @@ def main():
                 emo2idx=emo2idx,
                 num_emotions=num_emotions,
                 lam=LAMBDA_VAL,
-                top_k=T
-                OP_K
+                top_k=TOP_K
             )
 
         rows.append({

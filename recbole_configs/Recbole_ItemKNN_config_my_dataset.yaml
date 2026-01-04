@@ -1,0 +1,31 @@
+data_path: C:/Users/Emra/Desktop/PR/CaliTune/data
+
+seed: 920
+reproducibility: True
+
+USER_ID_FIELD: user
+ITEM_ID_FIELD: item
+LABEL_FIELD: label
+
+load_col:
+  inter: [user, item, label]
+
+# 5-core filtering
+user_inter_num: 5
+item_inter_num: 5
+
+# ItemKNN
+k: 100
+shrink: 0.0
+knn_method: item
+
+# Evaluation
+eval_args:
+  split:
+    RS: [0.8, 0.1, 0.1]
+  group_by: user
+  order: RO
+  mode: full
+
+metrics: [Recall, MRR, NDCG, Hit, Precision]
+topk: [10]
