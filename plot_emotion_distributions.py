@@ -6,16 +6,18 @@ import seaborn as sns
 
 # ================= CONFIG =================
 GEMS_PATH = "data/id_highest_gems.tsv"
+INTERACTIONS_PATH = "outputs/01_preprocessing/interactions_binarized.csv"
 OUTPUT_DIR = "outputs/04_evaluation"
+SCORE_TYPE = 'model'  # options: 'rank', 'model'
 
 # Models 
 MODELS = ["BPR", "ItemKNN", "MostPop"]
 
 # Path 
 FILE_PATTERNS = {
-    "BPR": "outputs/03_calibration/user_top10_BPR_calitune_lambda_{}.tsv",
-    "ItemKNN": "outputs/03_calibration/user_top10_itemknn_calitune_lambda_{}.tsv",
-    "MostPop": "outputs/03_calibration/user_top10_mostpop_calitune_lambda_{}.tsv"
+    "BPR": f"outputs/03_calibration/user_top10_BPR_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "ItemKNN": f"outputs/03_calibration/user_top10_itemknn_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "MostPop": f"outputs/03_calibration/user_top10_mostpop_calitune_{SCORE_TYPE}_lambda_{{}}.tsv"
 }
 # =========================================
 
@@ -36,10 +38,20 @@ def get_catalog_distribution(gems_df):
     counts = gems_df["emotion"].value_counts(normalize=True).sort_index()
     return counts
 
+def get_history_distribution(gems_df, interactions_path):
+    print(f"Loading interactions from {interactions_path}...")
+    inter = pd.read_csv(interactions_path)
+    # Assume cols: user, song, label
+    inter.columns = ["user", "song", "label"]
+    
+    # Merge with gems to get emotion
+    # Note: If the same track appears in multiple users' histories, it counts multiple times.
+    merged = inter.merge(gems_df, on="song", how="left")
+    
+    counts = merged["emotion"].value_counts(normalize=True).sort_index()
+    return counts
+
 def get_recommendation_distribution(lam, song2emotion):
-    
-    
-    
     dist_dict = {}
 
     for model in MODELS:
@@ -66,7 +78,6 @@ def get_recommendation_distribution(lam, song2emotion):
                 emotions.append(emo)
         
         # Count and normalize
-        
         if emotions:
             counts = pd.Series(emotions).value_counts(normalize=True)
             dist_dict[model] = counts
@@ -79,46 +90,62 @@ def get_recommendation_distribution(lam, song2emotion):
         return combined_df
     return pd.DataFrame()
 
-def plot_catalog_dist(counts, save_path):
+def plot_comparison_dist(dist1, dist2, label1, label2, title, save_path):
+    # Retrieve union of indices
+    idx = sorted(list(set(dist1.index) | set(dist2.index)))
+    
+    # Reindex to ensure alignment
+    d1 = dist1.reindex(idx, fill_value=0) * 100
+    d2 = dist2.reindex(idx, fill_value=0) * 100
+    
+    df = pd.DataFrame({
+        "Emotion": idx,
+        label1: d1.values,
+        label2: d2.values
+    })
+    
+    melted = df.melt(id_vars="Emotion", var_name="Type", value_name="Percentage")
+    
     plt.figure(figsize=(10, 6))
-    
-    # Simple bar plot
-    # x = emotions, y = percentage
-    emotions = counts.index
-    values = counts.values * 100 # Convert to %
-    
-    sns.barplot(x=emotions, y=values, color="skyblue")
-    
-    plt.title("Emotion Distribution in Catalog (Percentage of Tracks)", fontsize=14)
-    plt.ylabel("Percentage (%)", fontsize=12)
-    plt.xlabel("Emotion", fontsize=12)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    
-    plt.savefig(save_path)
-    plt.close()
-    print(f"Saved catalog plot to {save_path}")
-
-def plot_model_dist(df, title, save_path):
-    if df.empty:
-        print(f"No data to plot for {title}")
-        return
-
-    # Prepare data 
-    # Melt: Emotion | Model | Percentage
-    df_reset = df.reset_index().rename(columns={"index": "Emotion"})
-    melted = df_reset.melt(id_vars="Emotion", var_name="Model", value_name="Percentage")
-    melted["Percentage"] = melted["Percentage"] * 100 # Convert to %
-
-    plt.figure(figsize=(12, 6))
-    sns.barplot(data=melted, x="Emotion", y="Percentage", hue="Model")
+    sns.barplot(data=melted, x="Emotion", y="Percentage", hue="Type")
     
     plt.title(title, fontsize=14)
     plt.ylabel("Percentage (%)", fontsize=12)
     plt.xlabel("Emotion", fontsize=12)
     plt.xticks(rotation=45)
-    plt.legend(title="Model")
+    plt.legend()
+    plt.tight_layout()
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    plt.savefig(save_path)
+    plt.close()
+    print(f"Saved comparison plot to {save_path}")
+
+def plot_model_dist(df, catalog_dist, title, save_path):
+    if df.empty:
+        print(f"No data to plot for {title}")
+        return
+
+    # Add catalog to the dataframe for comparison
+    df_with_cat = df.copy()
+    
+    # Align catalog index
+    cat_aligned = catalog_dist.reindex(df.index, fill_value=0)
+    df_with_cat["Catalog"] = cat_aligned
+    
+    # Melt: Emotion | Model | Percentage
+    df_reset = df_with_cat.reset_index().rename(columns={"index": "Emotion"})
+    melted = df_reset.melt(id_vars="Emotion", var_name="Source", value_name="Percentage")
+    melted["Percentage"] = melted["Percentage"] * 100 # Convert to %
+
+    plt.figure(figsize=(12, 6))
+    sns.barplot(data=melted, x="Emotion", y="Percentage", hue="Source")
+    
+    plt.title(title, fontsize=14)
+    plt.ylabel("Percentage (%)", fontsize=12)
+    plt.xlabel("Emotion", fontsize=12)
+    plt.xticks(rotation=45)
+    plt.legend(title="Source")
     plt.tight_layout()
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     
@@ -135,17 +162,29 @@ def main():
     # 1. Catalog Distribution
     print("\n--- 1. Catalog Distribution ---")
     cat_counts = get_catalog_distribution(gems)
-    plot_catalog_dist(cat_counts, f"{OUTPUT_DIR}/plot_catalog_dist.png")
+    
+    # 2. History Distribution
+    print("\n--- 2. History Distribution ---")
+    if os.path.exists(INTERACTIONS_PATH):
+        hist_counts = get_history_distribution(gems, INTERACTIONS_PATH)
+        plot_comparison_dist(
+            cat_counts, hist_counts, 
+            "Catalog", "Listening History", 
+            "Catalog vs Listening History Emotion Distribution", 
+            f"{OUTPUT_DIR}/plot_catalog_vs_history.png"
+        )
+    else:
+        print("Interactions file not found, skipping History comparison.")
 
-    # 2. Top-10 (Lambda=0)
-    print("\n--- 2. Lambda=0 Distribution ---")
+    # 3. Top-10 (Lambda=0)
+    print("\n--- 3. Lambda=0 Distribution ---")
     df_lam0 = get_recommendation_distribution(0.0, song2emotion)
-    plot_model_dist(df_lam0, "Emotion Distribution in Top-10 Recs (Lambda=0)", f"{OUTPUT_DIR}/plot_lambda_0_dist.png")
+    plot_model_dist(df_lam0, cat_counts, "Catalog vs Top-10 Recs (Lambda=0)", f"{OUTPUT_DIR}/plot_lambda_0_dist.png")
 
-    # 3. Top-10 (Lambda=1)
-    print("\n--- 3. Lambda=1 Distribution ---")
+    # 4. Top-10 (Lambda=1)
+    print("\n--- 4. Lambda=1 Distribution ---")
     df_lam1 = get_recommendation_distribution(1.0, song2emotion)
-    plot_model_dist(df_lam1, "Emotion Distribution in Top-10 Recs (Lambda=1)", f"{OUTPUT_DIR}/plot_lambda_1_dist.png")
+    plot_model_dist(df_lam1, cat_counts, "Catalog vs Top-10 Recs (Lambda=1)", f"{OUTPUT_DIR}/plot_lambda_1_dist.png")
 
     print("\nDone.")
 

@@ -49,23 +49,40 @@ def rerank_linear(user_id, items, P_user, song2emotion, lam, top_k):
     scored_items.sort(key=lambda x: x[1], reverse=True)
     return [item for item, _ in scored_items[:top_k]]
 
-def rerank_greedy_jsd(user_id, items, P_user_dist, song2emotion, emo2idx, num_emotions, lam, top_k):
+def rerank_greedy_jsd(user_id, items, P_user_dist, song2emotion, emo2idx, num_emotions, lam, top_k, scores=None, score_type='rank'):
     """
     Greedy re-ranking minimizing JSD divergence.
+    score_type: 'rank' uses (n-r)/n, 'model' uses raw scores (normalized to [0,1]).
     """
     selected = []
-    remaining = items.copy()
+    remaining = list(range(len(items))) # Indices of items in the 'items' list
     
     q_counts = np.zeros(num_emotions, dtype=np.float64)
     n = len(items)
-    rank_rel = {it: (n - r) / n for r, it in enumerate(items)}
     
+    # 1. Determine Relevance Scores
+    if score_type == 'model' and scores is not None and len(scores) > 0:
+        # Min-Max Normalization to [0, 1]
+        s = np.array(scores, dtype=np.float64)
+        min_v = s.min()
+        max_v = s.max()
+        if max_v > min_v:
+            normalized_rel = (s - min_v) / (max_v - min_v)
+        else:
+            normalized_rel = np.ones_like(s) # Fallback if all scores are identical
+        relevance_map = {i: normalized_rel[i] for i in range(len(items))}
+    else:
+        # 'rank': Fallback to rank-based scoring: (n-i)/n
+        relevance_map = {i: (n - i) / n for i in range(len(items))}
+    
+    # 2. Greedy Selection Loop
     while len(selected) < top_k and remaining:
-        best_item = None
+        best_idx = None
         best_util = -np.inf
         best_emo_idx = None
         
-        for it in remaining:
+        for idx in remaining:
+            it = items[idx]
             emo = song2emotion.get(it)
             if emo not in emo2idx:
                 continue
@@ -77,23 +94,27 @@ def rerank_greedy_jsd(user_id, items, P_user_dist, song2emotion, emo2idx, num_em
             q_tmp[eidx] += 1.0
             q_dist = q_tmp / (len(selected) + 1)
             
-            # Divergence (JSD)
+            # Divergence (JSD) - lower is better, so we subtract it
             div = jensenshannon(P_user_dist + 1e-12, q_dist + 1e-12, base=2) ** 2
             
-            rel = rank_rel[it]
+            rel = relevance_map[idx]
             util = (1 - lam) * rel - lam * div
             
             if util > best_util:
                 best_util = util
-                best_item = it
+                best_idx = idx
                 best_emo_idx = eidx
         
-        if best_item is None:
-            selected.extend(remaining[:(top_k - len(selected))])
+        if best_idx is None:
+            # Fallback for remaining slots if items have no emotion data
+            for idx in remaining:
+                if len(selected) < top_k:
+                    selected.append(items[idx])
             break
             
-        selected.append(best_item)
+        selected.append(items[best_idx])
         q_counts[best_emo_idx] += 1.0
-        remaining.remove(best_item)
+        remaining.remove(best_idx)
         
     return selected[:top_k]
+

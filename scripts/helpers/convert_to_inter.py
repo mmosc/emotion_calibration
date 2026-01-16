@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as np
+import os
 
 # Define input and output file paths
 input_csv_path = "C:\\Users\\Emra\\Desktop\\PR\\outputs\\01_preprocessing\\interactions_binarized.csv"
@@ -8,14 +8,22 @@ output_inter_path = "C:\\Users\\Emra\\Desktop\\PR\\CaliTune\\data\\my_dataset\\m
 # Read the CSV file
 df = pd.read_csv(input_csv_path)
 
-# Rename columns to RecBole's expected format
-# Define the header for the .inter file
-# user:token, item:token, label:float
-header = "user:token\titem:token\tlabel:float"
+# Rename columns to match RecBole config field names
+df = df.rename(columns={"user": "user", "song": "item", "label": "label"})
 
-# Write the header and then the DataFrame to the .inter file
-with open(output_inter_path, 'w') as f:
-    f.write(header + '\n')
-    df.to_csv(f, sep='\t', index=False, header=False)
+# RecBole .inter files use tab separation and specific headers
+# format: field_name:field_type
+# Types: token, float, etc.
+# We'll use user:token, item:token, label:float
+
+# Create the .inter dataframe with the correct header format
+inter_df = df.copy()
+inter_df.columns = ["user:token", "item:token", "label:float"]
+
+# Save to .inter file
+os.makedirs(os.path.dirname(output_inter_path), exist_ok=True)
+inter_df.to_csv(output_inter_path, sep='\t', index=False)
 
 print(f"Successfully converted {input_csv_path} to {output_inter_path}")
+print(f"Columns: {inter_df.columns.tolist()}")
+print(f"Head:\n{inter_df.head()}")

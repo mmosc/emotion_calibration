@@ -6,12 +6,13 @@ import calibration_utils as utils
 # ============== CONFIG =================
 INTERACTIONS = "outputs/01_preprocessing/interactions_binarized.csv"
 GEMS         = "data/id_highest_gems.tsv"
+SCORE_TYPE = 'model'  # options: 'rank', 'model'
 
 # Model File Patterns
 MODELS = {
-    "BPR":      "outputs/03_calibration/user_top10_BPR_calitune_lambda_{}.tsv",
-    "ItemKNN":  "outputs/03_calibration/user_top10_itemknn_calitune_lambda_{}.tsv",
-    "MostPop":  "outputs/03_calibration/user_top10_mostpop_calitune_lambda_{}.tsv",
+    "BPR":      f"outputs/03_calibration/user_top10_BPR_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "ItemKNN":  f"outputs/03_calibration/user_top10_itemknn_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "MostPop":  f"outputs/03_calibration/user_top10_mostpop_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
 }
 
 # The Random baseline 
