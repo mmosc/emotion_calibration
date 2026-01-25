@@ -3,13 +3,11 @@ import pandas as pd
 import numpy as np
 from scipy.spatial.distance import jensenshannon
 import matplotlib.pyplot as plt
-from pathlib import Path
 
-# ============= CONFIG ==============
+# CONFIG
 DATA = "outputs/01_preprocessing/interactions_binarized.csv"
 GEMS = "data/id_highest_gems.tsv"
 
-# Recommendation outputs for each model
 BPR_RECS      = "outputs/02_base_recs/user_top100_BPR.tsv"
 ITEMKNN_RECS  = "outputs/02_base_recs/user_top100_itemknn.tsv"
 MOSTPOP_RECS  = "outputs/02_base_recs/user_top100_mostpop.tsv"
@@ -18,18 +16,21 @@ RANDOM_RECS   = "outputs/02_base_recs/user_top100_random.tsv"
 OUTPUT_TABLE = "outputs/04_evaluation/evaluation_summary.csv"
 OUTPUT_KLJSD = "outputs/04_evaluation/calibration_all_models.csv"
 
-# ===================================
+def ndcg_at_k(recommended_items, relevant_items, k=10):
+    rec_k = recommended_items[:k]
+    dcg = 0.0
+    for i, item in enumerate(rec_k):
+        if item in relevant_items:
+            dcg += 1 / np.log2(i + 2)
+    
+    idcg = 0.0
+    for i in range(min(len(relevant_items), k)):
+        idcg += 1 / np.log2(i + 2)
+    
+    return dcg / idcg if idcg > 0 else 0
 
 def main():
-    # ====== Step 0: Path Handling ======
-    # Ensure we can find the files if running from project root
-    files_to_check = [DATA, GEMS]
-    missing = [f for f in files_to_check if not os.path.exists(f)]
-    if missing:
-        print(f"Error: Missing input files: {missing}")
-        return
-
-    # ====== Step 1: Load data ==========
+    # Load data 
     inter = pd.read_csv(DATA)
     inter.columns = ["user", "song", "label"]
 
@@ -38,136 +39,106 @@ def main():
 
     EMOTIONS = sorted(gems["emotion"].dropna().unique())
 
-    # Build user history for NDCG
-    user_history = (
-        inter.groupby("user")["song"]
-        .apply(set)
-        .to_dict()
-    )
+    # Build user history
+    user_history = {}
+    for user, group in inter.groupby("user"):
+        user_history[user] = set(group["song"])
 
-    # ====== Load recommendation files ===========
-    def load_recs(path, name):
-        if not os.path.exists(path):
-            print(f"Warning: {name} file not found at {path}. Skipping.")
-            return None
-        df = pd.read_csv(path, sep="\t")
-        df["list"] = df["recommended_items"].apply(lambda x: str(x).split(","))
-        return df[["user_id", "list"]]
-
+    # Load recommendations
     models = {}
-    for name, path in [("BPR", BPR_RECS), ("ItemKNN", ITEMKNN_RECS), 
-                       ("MostPop", MOSTPOP_RECS), ("Random", RANDOM_RECS),
-                       ("Random_Calib", "outputs/03_calibration/user_top10_random_calitune.tsv")]:
-        recs_df = load_recs(path, name)
-        if recs_df is not None:
-            models[name] = recs_df
+    paths = [
+        ("BPR", BPR_RECS), 
+        ("ItemKNN", ITEMKNN_RECS), 
+        ("MostPop", MOSTPOP_RECS), 
+        ("Random", RANDOM_RECS)
+    ]
 
-    if not models:
-        print("No recommendation files found to evaluate.")
-        return
+    for name, path in paths:
+        if os.path.exists(path):
+            df = pd.read_csv(path, sep="\t")
+            df["list"] = df["recommended_items"].apply(lambda x: str(x).split(","))
+            models[name] = df[["user_id", "list"]]
 
-    # ====== Step 2: NDCG@10 per user ===========
-    def ndcg_at_k(recommended_items, relevant_items, k=10):
-        rec_k = recommended_items[:k]
-        dcg = sum([1/np.log2(i+2) for i, item in enumerate(rec_k) if item in relevant_items])
-        idcg = sum([1/np.log2(i+2) for i in range(min(len(relevant_items), k))])
-        return dcg / idcg if idcg > 0 else 0
+    # Evaluation
+    ndcg_results = {}
+    kl_results = {}
+    jsd_results = {}
 
-    def compute_ndcg(model_df):
-        rows = []
+    # Build P_u (user history distribution)
+    merged = inter.merge(gems, on="song", how="left")
+    counts = merged.groupby(["user", "emotion"]).size().unstack(fill_value=0)
+    P = counts.reindex(columns=EMOTIONS, fill_value=0)
+    P = P.div(P.sum(axis=1), axis=0)
+
+    for name, model_df in models.items():
+        print(f"Evaluating {name}...")
+        ndcg_vals = []
+        kl_vals = []
+        jsd_vals = []
+
         for idx, row in model_df.iterrows():
             user = row["user_id"]
             recs = row["list"]
+            
+            # NDCG
             relevant = user_history.get(user, set())
-            score = ndcg_at_k(recs, relevant, k=10)
-            rows.append(score)
-        return np.array(rows)
+            ndcg_vals.append(ndcg_at_k(recs, relevant, k=10))
 
-    ndcg_scores = {name: compute_ndcg(df) for name, df in models.items()}
+            # Emotion Dist for Recs
+            if user in P.index:
+                q_counts = np.zeros(len(EMOTIONS))
+                emo_map = dict(zip(gems["song"], gems["emotion"]))
+                emo2idx = {e: i for i, e in enumerate(EMOTIONS)}
+                
+                for s in recs[:10]:
+                    e = emo_map.get(s)
+                    if e in emo2idx:
+                        q_counts[emo2idx[e]] += 1
+                
+                q = (q_counts / 10) + 1e-12
+                p = P.loc[user].values + 1e-12
+                
+                kl = np.sum(p * np.log(p / q))
+                jsd = jensenshannon(p, q, base=2) ** 2
+                
+                kl_vals.append(kl)
+                jsd_vals.append(jsd)
 
-    # ====== Step 3: KL@10 + JSD@10 per user ==========
-    def emotion_dist(df, user_col="user", item_col="song"):
-        merged = df.merge(gems, left_on=item_col, right_on="song", how="left")
-        counts = merged.groupby([user_col, "emotion"]).size().unstack(fill_value=0)
-        counts = counts.reindex(columns=EMOTIONS, fill_value=0)
-        probs = counts.div(counts.sum(axis=1), axis=0)
-        return probs
+        ndcg_results[name] = np.array(ndcg_vals)
+        kl_results[name] = np.array(kl_vals)
+        jsd_results[name] = np.array(jsd_vals)
 
-    P = emotion_dist(inter, user_col="user", item_col="song")   
-
-    def rec_emotion_dist(rec_df, k=10):
-        rows = []
-        for idx, row in rec_df.iterrows():
-            user = row["user_id"]
-            for s in row["list"][:k]:
-                rows.append({"user": user, "song": s})
-        df = pd.DataFrame(rows)
-        return emotion_dist(df, user_col="user", item_col="song")
-
-    KL = {}
-    JSD = {}
-
-    for model_name, rec_df in models.items():
-        Q = rec_emotion_dist(rec_df, k=10)
-        shared_users = set(P.index).intersection(Q.index)
-        
-        kl_vals, jsd_vals = [], []
-        
-        for u in shared_users:
-            p = P.loc[u, EMOTIONS].values + 1e-12
-            q = Q.loc[u, EMOTIONS].values + 1e-12
-            
-            kl = np.sum(p * np.log(p / q))
-            jsd = jensenshannon(p, q, base=2) ** 2
-            
-            kl_vals.append(kl)
-            jsd_vals.append(jsd)
-
-        KL[model_name] = np.array(kl_vals)
-        JSD[model_name] = np.array(jsd_vals)
-
-    # ====== Step 4: Create Summary Table ==========
-    rows = []
-    for model in models.keys():
-        rows.append({
-            "Model": model,
-            "nDCG@10_mean": ndcg_scores[model].mean(),
-            "nDCG@10_std": ndcg_scores[model].std(),
-            "KL@10_mean": KL[model].mean(),
-            "KL@10_std": KL[model].std(),
-            "JSD@10_mean": JSD[model].mean(),
-            "JSD@10_std": JSD[model].std(),
+    # Summary Table
+    summary_rows = []
+    for name in ndcg_results.keys():
+        summary_rows.append({
+            "Model": name,
+            "nDCG@10_mean": ndcg_results[name].mean(),
+            "nDCG@10_std": ndcg_results[name].std(),
+            "KL@10_mean": kl_results[name].mean(),
+            "KL@10_std": kl_results[name].std(),
+            "JSD@10_mean": jsd_results[name].mean(),
+            "JSD@10_std": jsd_results[name].std(),
         })
 
-    summary = pd.DataFrame(rows)
-    summary.to_csv(OUTPUT_TABLE, index=False)
-    print("Saved summary table to:", OUTPUT_TABLE)
+    pd.DataFrame(summary_rows).to_csv(OUTPUT_TABLE, index=False)
+    
+    # Per-user results
+    user_rows = []
+    for name in kl_results.keys():
+        for kl, jsd in zip(kl_results[name], jsd_results[name]):
+            user_rows.append({"model": name, "KL": kl, "JSD": jsd})
+    pd.DataFrame(user_rows).to_csv(OUTPUT_KLJSD, index=False)
 
-    # ====== Step 5: Save per-user KL/JSD for all models ==========
-    all_rows = []
-    for model in models.keys():
-        for kl, jsd in zip(KL[model], JSD[model]):
-            all_rows.append({"model": model, "KL": kl, "JSD": jsd})
-
-    pd.DataFrame(all_rows).to_csv(OUTPUT_KLJSD, index=False)
-    print("Saved KL/JSD per-user file to:", OUTPUT_KLJSD)
-
-    # ====== Step 6: Boxplots ============
-    def make_boxplot(data_dict, title):
+    #  Plotting
+    for metric_name, data in [("nDCG@10", ndcg_results), ("KL@10", kl_results), ("JSD@10", jsd_results)]:
         plt.figure(figsize=(8,6))
-        plt.boxplot(data_dict.values(), tick_labels=data_dict.keys())
-        plt.title(title)
-        plt.ylabel(title)
+        plt.boxplot(data.values(), labels=data.keys())
+        plt.title(metric_name)
+        plt.ylabel("Score")
         plt.grid(True)
-        
-        # Save to evaluation folder
-        filename = f"outputs/04_evaluation/{title.replace('/', '_').replace(' ', '_')}.png"
-        plt.savefig(filename, dpi=150, bbox_inches="tight")
-        print(f"Saved plot to: {filename}")
-
-    make_boxplot(ndcg_scores, "nDCG@10")
-    make_boxplot(KL, "KL@10 Divergence")
-    make_boxplot(JSD, "Jensen-Shannon Divergence (JSD@10)")
+        plt.savefig(f"outputs/04_evaluation/{metric_name.replace('@', '_')}_boxplot.png")
+        plt.close()
 
 if __name__ == "__main__":
     main()

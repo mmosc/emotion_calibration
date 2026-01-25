@@ -62,7 +62,7 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).to_csv(out_path, sep="\t", index=False)
     
-    print(f"✅ Saved MostPop recommendations to {out_path}")
+    print(f"Saved MostPop recommendations to {out_path}")
 
 if __name__ == "__main__":
     main()
