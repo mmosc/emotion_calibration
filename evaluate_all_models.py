@@ -30,7 +30,9 @@ def ndcg_at_k(recommended_items, relevant_items, k=10):
     return dcg / idcg if idcg > 0 else 0
 
 def main():
-    # Load data 
+    os.makedirs(os.path.dirname(OUTPUT_TABLE), exist_ok=True)
+
+    # Load data
     inter = pd.read_csv(DATA)
     inter.columns = ["user", "song", "label"]
 

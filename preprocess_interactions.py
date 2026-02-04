@@ -30,6 +30,9 @@ def filter_k_core(df, k=5):
     return df
 
 def main():
+    Path(COUNTS_FILE).parent.mkdir(parents=True, exist_ok=True)
+    Path(OUTPUT_FILE).parent.mkdir(parents=True, exist_ok=True)
+
     in_path = Path(INPUT_FILE)
     if not in_path.exists():
         print(f"Input file not found: {in_path}")

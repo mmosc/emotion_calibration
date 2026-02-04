@@ -65,7 +65,7 @@ def main():
         plot_data["Catalog"] = cat_counts.reindex(all_emotions, fill_value=0).values * 100
         
         for model in MODELS:
-            fname = f"outputs/03_calibration/user_top10_{model.lower()}_calitune_{SCORE_TYPE}_lambda_{lam}.tsv"
+            fname = f"outputs/03_calibration/user_top10_{model.lower()}_calibrated_{SCORE_TYPE}_lambda_{lam}.tsv"
             if os.path.exists(fname):
                 df = pd.read_csv(fname, sep="\t")
                 recs = []

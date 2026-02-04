@@ -5,7 +5,7 @@ import calibration_utils as utils
 INTERACTIONS = "outputs/01_preprocessing/interactions_binarized.csv"
 GEMS         = "data/id_highest_gems.tsv"
 INPUT_RECS   = "outputs/02_base_recs/user_top100_random.tsv"
-SAVE_FILE    = "outputs/03_calibration/user_top10_random_calitune.tsv"
+SAVE_FILE    = "outputs/03_calibration/user_top10_random_calibrated.tsv"
 
 TOP_K = 10
 LAMBDA_VAL = 1.0 

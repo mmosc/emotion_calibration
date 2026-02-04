@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load the tsv file
-df = pd.read_csv('C:\\Users\\Emra\\Desktop\\PR\\CaliTune\\id_gems.tsv\\id_gems.tsv', sep='\t')
+df = pd.read_csv('data/id_gems.tsv', sep='\t')
 
 # Set the 'id' column as the index
 df.set_index('id', inplace=True)
@@ -16,4 +16,4 @@ df.reset_index(inplace=True)
 result_df = df[['id', 'highest_gem']]
 
 # Save the result to a new tsv file
-result_df.to_csv('C:\\Users\\Emra\\Desktop\\PR\\id_highest_gems.tsv', sep='\t', index=False)
+result_df.to_csv('data/id_highest_gems.tsv', sep='\t', index=False)

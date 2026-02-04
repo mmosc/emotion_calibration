@@ -2,8 +2,8 @@ import pandas as pd
 import os
 
 # Define input and output file paths
-input_csv_path = "C:\\Users\\Emra\\Desktop\\PR\\outputs\\01_preprocessing\\interactions_binarized.csv"
-output_inter_path = "C:\\Users\\Emra\\Desktop\\PR\\CaliTune\\data\\my_dataset\\my_dataset.inter"
+input_csv_path = "outputs/01_preprocessing/interactions_binarized.csv"
+output_inter_path = "calibration/data/my_dataset/my_dataset.inter"
 
 # Read the CSV file
 df = pd.read_csv(input_csv_path)

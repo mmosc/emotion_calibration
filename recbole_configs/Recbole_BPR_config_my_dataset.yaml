@@ -1,6 +1,6 @@
 model: BPR
 dataset: my_dataset
-data_path: C:/Users/Emra/Desktop/PR/CaliTune/data
+data_path: calibration/data
 
 field_separator: "\t"
 seed: 920
@@ -20,7 +20,7 @@ item_inter_num: 0
 embedding_size: 256
 
 # Training and evaluation config
-epochs: 300
+epochs: 3
 train_batch_size: 4096
 eval_batch_size: 4096
 learning_rate: 0.0001

@@ -6,27 +6,24 @@ from pathlib import Path
 from recbole.quick_start import load_data_and_model
 from recbole.data.interaction import Interaction
 
+# Patch torch.load for PyTorch >= 2.6 compatibility with RecBole
+_orig_load = torch.load
+torch.load = lambda *a, **kw: _orig_load(*a, **dict(kw, weights_only=False))
+
 def main():
     # Setup paths
     project_root = Path.cwd()
-    calitune_path = project_root / "CaliTune"
-    
-    if not calitune_path.exists() and Path("CaliTune").exists():
-        calitune_path = Path("CaliTune").absolute()
-    
-    os.chdir(calitune_path)
-    
+
     # Load latest ItemKNN model
-    model_files = glob.glob(str(calitune_path / "saved" / "ItemKNN-*.pth"))
+    model_files = glob.glob(str(project_root / "saved" / "ItemKNN-*.pth"))
     if not model_files:
         print("Error: No ItemKNN model found in saved/ directory.")
         return
-    
+
     model_path = max(model_files, key=os.path.getmtime)
-    rel_model_path = os.path.relpath(model_path, start=calitune_path)
-    print(f"Loading model: {rel_model_path}")
-    
-    config, model, dataset, _, _, _ = load_data_and_model(rel_model_path)
+    print(f"Loading model: {model_path}")
+
+    config, model, dataset, _, _, _ = load_data_and_model(model_path)
     
     device = torch.device(config["device"])
     model.to(device)

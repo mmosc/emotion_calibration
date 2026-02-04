@@ -1,31 +1,29 @@
 import os
+import torch
 import pandas as pd
 import glob
 import numpy as np
 from pathlib import Path
 from recbole.quick_start import load_data_and_model
 
+# Patch torch.load for PyTorch >= 2.6 compatibility with RecBole
+_orig_load = torch.load
+torch.load = lambda *a, **kw: _orig_load(*a, **dict(kw, weights_only=False))
+
 def main():
     # Setup paths
     project_root = Path.cwd()
-    calitune_path = project_root / "CaliTune"
-    
-    if not calitune_path.exists() and Path("CaliTune").exists():
-        calitune_path = Path("CaliTune").absolute()
-    
-    os.chdir(calitune_path)
-    
+
     # Load dataset using any available model
-    model_files = glob.glob(str(calitune_path / "saved" / "BPR-*.pth"))
+    model_files = glob.glob(str(project_root / "saved" / "BPR-*.pth"))
     if not model_files:
         print("Error: No BPR model found. Need it to load the dataset split.")
         return
-    
+
     model_path = max(model_files, key=os.path.getmtime)
-    rel_model_path = os.path.relpath(model_path, start=calitune_path)
-    
+
     print("Loading dataset split...")
-    _, _, dataset, _, _, test_data = load_data_and_model(rel_model_path)
+    _, _, dataset, _, _, test_data = load_data_and_model(model_path)
     
     # Calculate relative popularity from test set
     print("Calculating relative popularity in test set...")

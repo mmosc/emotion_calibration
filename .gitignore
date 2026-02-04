@@ -1,4 +1,4 @@
-/CaliTune
+/calibration
 listening_history.csv
 interactions_binarized.csv
 counts.csv
@@ -10,3 +10,15 @@ data/
 *.pth
 *.zip
 large_files.txt
+
+# IDE config
+.idea/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Training logs (contain hostnames and paths)
+log/
+log_tensorboard/
+saved/

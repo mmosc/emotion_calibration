@@ -9,9 +9,9 @@ SCORE_TYPE = 'model' # options: 'rank', 'model'
 MODELS = ["BPR", "ItemKNN", "MostPop"]
 
 FILE_PATTERNS = {
-    "BPR": f"outputs/03_calibration/user_top10_BPR_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
-    "ItemKNN": f"outputs/03_calibration/user_top10_itemknn_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
-    "MostPop": f"outputs/03_calibration/user_top10_mostpop_calitune_{SCORE_TYPE}_lambda_{{}}.tsv"
+    "BPR": f"outputs/03_calibration/user_top10_BPR_calibrated_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "ItemKNN": f"outputs/03_calibration/user_top10_itemknn_calibrated_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "MostPop": f"outputs/03_calibration/user_top10_mostpop_calibrated_{SCORE_TYPE}_lambda_{{}}.tsv"
 }
 
 def load_gems():

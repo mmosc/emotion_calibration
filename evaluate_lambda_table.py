@@ -10,15 +10,15 @@ SCORE_TYPE = 'model'  # options: 'rank', 'model'
 
 # Model File Patterns
 MODELS = {
-    "BPR":      f"outputs/03_calibration/user_top10_BPR_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
-    "ItemKNN":  f"outputs/03_calibration/user_top10_itemknn_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
-    "MostPop":  f"outputs/03_calibration/user_top10_mostpop_calitune_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "BPR":      f"outputs/03_calibration/user_top10_bpr_calibrated_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "ItemKNN":  f"outputs/03_calibration/user_top10_itemknn_calibrated_{SCORE_TYPE}_lambda_{{}}.tsv",
+    "MostPop":  f"outputs/03_calibration/user_top10_mostpop_calibrated_{SCORE_TYPE}_lambda_{{}}.tsv",
 }
 
 # The Random baseline 
 RANDOM_REC = "outputs/02_base_recs/user_top100_random.tsv"
 
-LAMBDAS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+LAMBDAS = [0.5]
 TOP_K = 10
 # =======================================
 

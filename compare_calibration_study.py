@@ -12,8 +12,8 @@ TOP_K = 10
 
 # Methods to compare
 METHODS = {
-    "Greedy (CaliTune)": {
-        "pattern": "outputs/03_calibration/user_top10_{}_calitune_model_lambda_{}.tsv",
+    "Greedy (Calibrated)": {
+        "pattern": "outputs/03_calibration/user_top10_{}_calibrated_model_lambda_{}.tsv",
         "color": "blue",
         "marker": "o"
     },
@@ -24,8 +24,8 @@ METHODS = {
     }
 }
 
-MODELS = ["BPR", "ItemKNN", "MostPop"]
-LAMBDAS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+MODELS = ["bpr", "itemknn", "mostpop"]
+LAMBDAS = [0.5]
 # =======================================
 
 def ndcg_at_k(items, relevant, k=10):

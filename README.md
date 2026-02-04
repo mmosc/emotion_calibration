@@ -1,132 +1,222 @@
-# Emotion-Aware Evaluation of Music Recommender Systems
+# Emotion-calibrated Music Recommendation
 
-This repository contains the code and experiments for an emotion-aware evaluation of music recommender systems. The project investigates the trade-off between ranking accuracy and emotional calibration, and adapts the CaliTune post-hoc calibration framework to a music recommendation setting.
+This repository contains the code for the paper Emotion-calibrated Music Recommendation, under review for UMAP'26.
 
-## 1. Project Overview
+The project analyzes a music catalog in terms of the GEMS [[1]](#1) emotion annotations provided with SRGNN-Emo [[2]](#2). It then applies calibration [[3]](#3) to the music recommendation, matching the distribution of emotions to the user's past listenings. The catalog used is extracted from the Music4All-Onion dataset [[4]](#4).
 
-Traditional recommender systems are typically optimized for ranking accuracy (e.g., nDCG), but ignore whether recommendations match a user’s emotional preferences.
-This project extends standard evaluation by incorporating emotion-aware calibration metrics, and applies post-hoc greedy re-ranking inspired by the CaliTune paper.
+## Prerequisites
 
-**Main goals:**
-- Evaluate standard recommender models using ranking metrics.
-- Measure emotional calibration of recommendations.
-- Apply CaliTune-style greedy post-processing to improve calibration.
-- Analyze the trade-off between accuracy and calibration.
+### Environment Setup
 
-## 2. Data Preparation
+Create a conda environment and install the dependencies:
 
-### 2.1 Raw Listening History
+```bash
+conda create -n emotion-recsys python=3.10
+conda activate emotion-recsys
+pip install -r requirements.txt
+```
+
+Key dependencies: `pandas`, `numpy`, `scipy`, `matplotlib`, `torch`, `recbole`.
+
+### Data
+
+Place the following files in the `data/` directory before running the pipeline:
+
+| File | Description | Source |
+|------|-------------|--------|
+| `data/listening_history.csv` | User-song interaction logs (play counts) | [Zenodo](https://zenodo.org/records/18431594) |
+| `data/id_gems.tsv` | Multi-dimensional GEM emotion scores per song | [Zenodo]() |
+
+### Project Structure
+
+```
+├── preprocess_interactions.py                              # Step 1: Data preprocessing
+├── scripts/helpers/
+│   ├── convert_to_inter.py               # Step 1: Convert to RecBole format
+│   └── convert_highest_gem.py            # Step 2: Extract dominant emotion per song
+├── train_model.py                        # Step 3: Train RecBole models
+├── generate_*_recommendations.py         # Step 3: Generate base recommendations
+├── calibrate_*_greedy.py                 # Step 4: Greedy calibration re-ranking
+├── evaluate_all_models.py                # Step 5: Base model evaluation
+├── compare_calibration_study.py          # Step 5: Calibration trade-off analysis
+├── evaluate_lambda_table.py              # Step 5: Lambda sensitivity table
+├── calibration_utils.py                  # Shared calibration utilities
+├── plot_emotion_distributions.py         # Visualization
+├── plot_user_profile_distribution.py     # Visualization
+├── recbole_configs/                      # RecBole model configurations
+│   ├── Recbole_BPR_config_my_dataset.yaml
+│   └── Recbole_ItemKNN_config_my_dataset.yaml
+├── data/                                 # Input data (not tracked)
+├── outputs/                              # Generated outputs (not tracked)
+└── calibration/                          # RecBole working directory (not tracked)
+```
+
+## 1. Data Preparation
+
+### 1.1 Raw Listening History
 - **Input file**: `data/listening_history.csv`
-- Contains user–song interaction logs (play counts).
+- Contains user-song interaction logs (play counts). Can be downloaded [here](https://zenodo.org/records/18431594)
 - **Data cleaning steps**:
     - Removed invalid or empty user/song entries.
     - Aggregated play counts per (user, song) pair.
 
-### 2.2 Interaction Binarization
-- Converted play counts into implicit feedback.
+### 1.2 Interaction Binarization
+- Converts play counts into implicit feedback.
 - **Workflow**:
-    1. Kept only (user, song) pairs with **≥ 2 listens** to remove initial noise.
-    2. Applied **5-core filtering** (iteratively removed users and songs with < 5 interactions).
-- Assigned a fixed implicit feedback label (`label = 5`, compatible with RecBole).
+    1. Keeps only (user, song) pairs with **>= 2 listens** to remove noise.
+    2. Applies **5-core filtering** (iteratively removes users and songs with < 5 interactions).
+- Assigns a fixed implicit feedback label (`label = 5`, compatible with RecBole).
 - **Output file**: `outputs/01_preprocessing/interactions_binarized.csv`
 
-### 2.3 Conversion to RecBole Format
-- Converted interactions into RecBole-compatible `.inter` schema:
+**Run:**
+
+```bash
+python preprocess_interactions.py
+```
+
+This reads `data/listening_history.csv`, applies binarization and 5-core filtering, and writes the binarized interactions to `outputs/01_preprocessing/interactions_binarized.csv`.
+
+### 1.3 Conversion to RecBole Format
+- Converts interactions into RecBole-compatible `.inter` schema:
   ```
   user:token    item:token    label:float
   ```
-- Enabled training and inference with RecBole models.
+- Enables training and inference with RecBole models.
 
-## 3. Emotion Metadata Processing
+**Run:**
 
-### 3.1 GEM Emotion Labels
-- **Input file**: `data/id_gems.tsv`
-- Contains multi-dimensional GEM emotion scores per song.
+```bash
+python scripts/helpers/convert_to_inter.py
+```
 
-### 3.2 Dominant Emotion Extraction
-- For each song, selected the emotion with the highest score.
-- **Output file**: `data/id_highest_gems.tsv` (columns: `song`, `emotion`)
+This converts `outputs/01_preprocessing/interactions_binarized.csv` into `calibration/data/my_dataset/my_dataset.inter`.
 
-### 3.3 User Emotion Profiles
-- Merged emotion labels with interaction data.
-- Computed per-user historical emotion distributions $P_u(e)$: normalized frequency of emotions in user listening history.
+## 2. Emotion Metadata Processing
 
-## 4. Recommendation Models
+### 2.1 GEM Emotion Labels
+- **Input file**: `data/id_gems.tsv` can be downloaded [here]()
+- Contains multi-dimensional GEMS emotion annotations per song. 
 
-The following models were evaluated using Top-100 recommendations per user.
+### 2.2 Dominant Emotion Extraction
+- For each song, selects the emotion with the highest score.
+- **Output file**: `data/id_highest_gems.tsv` (columns: `id`, `highest_gem`)
 
-### 4.1 BPR (Bayesian Personalized Ranking)
-- Pairwise ranking model trained on implicit feedback.
-- Implemented using RecBole.
-- **Output**: `outputs/02_base_recs/user_top100_BPR.tsv`
+**Run:**
 
-### 4.2 ItemKNN
-- Item-based k-nearest-neighbors recommender.
-- Implemented using RecBole.
-- **Output**: `outputs/02_base_recs/user_top100_itemknn.tsv`
+```bash
+python scripts/helpers/convert_highest_gem.py
+```
 
-### 4.3 MostPop
-- Non-personalized popularity baseline.
-- Recommends the globally most frequently listened songs.
-- **Output**: `outputs/02_base_recs/user_top100_mostpop.tsv`
+This reads `data/id_gems.tsv`, picks the dominant emotion per song, and writes the result to `data/id_highest_gems.tsv`.
 
-### 4.4 Random
-- Random baseline.
-- Uniformly samples items.
-- **Output**: `outputs/02_base_recs/user_top100_random.tsv`
+### 2.3 User Emotion Profiles
+- Merges emotion labels with interaction data.
+- Computes per-user historical emotion distributions $P_u$: normalized frequency of emotions in user listening history.
+- This step is performed automatically by the calibration scripts (Section 6) via `calibration_utils.py`. No separate script needs to be run.
 
-## 5. Evaluation Metrics
+## 3. Recommendation Models
 
-### 5.1 Ranking Accuracy
+### 3.1 Training
+
+Train the BPR [[5]](#5) and ItemKNN [[6]](#6) models using RecBole. Configuration files are in `recbole_configs/`. Trained models are saved to `saved/`.
+
+**Run:**
+
+```bash
+python train_model.py BPR
+python train_model.py ItemKNN
+```
+
+### 3.2 Generating Recommendations
+
+Generate Top-100 recommendation lists per user for all four models:
+
+```bash
+python generate_bpr_recommendations.py
+python generate_itemknn_recommendations.py
+python generate_mostpop_recommendations.py
+python generate_random_recommendations.py
+```
+
+| Model | Description | Output |
+|-------|-------------|--------|
+| BPR | Pairwise ranking on implicit feedback | `outputs/02_base_recs/user_top100_BPR.tsv` |
+| ItemKNN | Item-based k-nearest-neighbors | `outputs/02_base_recs/user_top100_itemknn.tsv` |
+| MostPop | Non-personalized popularity baseline | `outputs/02_base_recs/user_top100_mostpop.tsv` |
+| Random | Uniform random item sampling | `outputs/02_base_recs/user_top100_random.tsv` |
+
+> **Note:** MostPop loads the BPR checkpoint to access the dataset split. Random reads the interactions and BPR output files directly — neither requires its own trained model.
+
+## 4. Evaluation Metrics
+
+### 4.1 Ranking Accuracy
 - **nDCG@10**: Measures how well the top-10 recommendations match past user interactions.
 
-### 5.2 Emotional Calibration (Top-10)
+### 4.2 Emotional Calibration (Top-10)
 Calibration is computed by comparing:
 - $P_u$: user’s historical emotion distribution
-- $Q_u$: emotion distribution of the Top-10 recommendations
+- $R_u$: emotion distribution of the Top-10 recommendations
 
 **Metrics**:
-- **KL@10**: Kullback–Leibler divergence (directional)
-- **JSD@10**: Jensen–Shannon divergence (symmetric, bounded)
-- *Lower values indicate better emotional alignment.*
+- **JSD@10**: Jensen–Shannon divergence  (*Lower values indicate better emotional alignment.*)
+- **JSD@10**: Kullback-Leibler divergence  (*Lower values indicate better emotional alignment.*)
+- **NDCG@10**: Normalized discounted cumulative gain (*Higher values indicate better accuracy.*)
 
-## 6. Baseline Evaluation
-Computed nDCG@10, KL@10, and JSD@10 for all models.
-- **Saved**:
-    - `outputs/04_evaluation/evaluation_summary.csv` (mean & std per model)
-    - `outputs/04_evaluation/calibration_all_models.csv` (per-user metrics)
-- **Visualizations**: Boxplots for nDCG@10, KL@10, and JSD@10.
+## 5. Baseline Evaluation
 
-## 7. CaliTune-Style Post-hoc Calibration (Main Contribution)
+Computes nDCG@10 and JSD@10 for all models. Also generates boxplot figures for each metric.
 
-### 7.1 Motivation
-Initial heuristic re-ranking approaches did not guarantee improved calibration for higher λ values. To address this, the project adopts the greedy list-level re-ranking strategy from the CaliTune paper.
+**Run:**
 
-### 7.2 Method
-- Applied post-hoc greedy re-ranking to BPR, ItemKNN, and MostPop recommendations.
-- Built the recommendation list one item at a time.
-- At each step, selected the item that maximizes:
+```bash
+python evaluate_all_models.py
+```
+
+**Outputs:**
+- `outputs/04_evaluation/evaluation_summary.csv` (mean & std per model)
+- `outputs/04_evaluation/calibration_all_models.csv` (per-user KL and JSD)
+- `outputs/04_evaluation/*_boxplot.png` (boxplots per metric)
+
+## 6. Post-processing Calibration
+
+### 6.1 Method
+Applies post-hoc greedy re-ranking to BPR, ItemKNN, and MostPop recommendations. At each step, selected the item that maximizes:
   $$ (1 - \lambda) \cdot \text{relevance} - \lambda \cdot \text{JSD}(P_u, Q_L) $$
-  - Relevance is approximated from the original ranking.
-  - Calibration is computed explicitly at the list level.
+Relevance is approximated from the original ranking, or from the model's recommendation score Calibration is computed explicitly at the list level. Re-ranking restricted to **Top-100 candidates** per user.
 
-### 7.3 Practical Optimizations
-- Re-ranking restricted to **Top-50 candidates** per user (as in CaliTune).
-- Used integer emotion indices instead of strings.
-- Avoided expensive list operations in inner loops.
+### 6.2 Run
 
-### 7.4 Outputs
-Generated calibrated Top-10 recommendations for $\lambda \in \{0.0, 0.1, 0.3, 0.5, 0.7, 1.0\}$.
-- **Output files**: `outputs/03_calibration/user_top10_<Model>_calitune_lambda_<λ>.tsv`
+Apply greedy re-ranking to each model's Top-100 recommendations:
 
-## 8. Lambda Sensitivity Analysis
-Evaluated calibrated recommendations for each $\lambda$.
-- **Expected behavior**:
-    - $\lambda = 0 \to$ highest ranking accuracy
-    - $\lambda \to 1 \to$ improved emotional calibration (lower KL/JSD)
+```bash
+python calibrate_bpr_greedy.py
+python calibrate_itemknn_greedy.py
+python calibrate_mostpop_greedy.py
+```
 
-## 9. Current Status
-- ✅ Data preparation completed
-- ✅ Baseline models evaluated
-- ✅ Emotional calibration metrics implemented
-- ✅ CaliTune-style greedy re-ranking applied to BPR, ItemKNN, and MostPop
+The `LAMBDAS` list at the top of each script controls which $\lambda$ values are evaluated. By default it is set to `[0.5]`. To run on all lambdas, change it to e.g. `[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]`.
+
+**Output files**: `outputs/03_calibration/user_top10_<model>_calibrated_model_lambda_<λ>.tsv`
+
+## 7. Lambda Sensitivity Analysis
+
+Evaluates calibrated recommendations for each $\lambda$, producing a summary table and trade-off plots.
+
+**Run:**
+
+```bash
+python evaluate_lambda_table.py
+python compare_calibration_study.py
+```
+
+**Outputs:**
+- `outputs/04_evaluation/lambda_table_formatted.csv` (nDCG, KL, JSD per model and $\lambda$)
+- `outputs/04_evaluation/comparison_study_results.csv` (detailed per-method results)
+- `outputs/04_evaluation/comparison_<model>_tradeoff.png` (accuracy vs calibration trade-off plots)
+
+> **Note:** Both scripts have a `LAMBDAS` list at the top that must match the $\lambda$ values used in the calibration step (Section 6).
+
+
+
+## References
+<a id="1">[1]</a> 

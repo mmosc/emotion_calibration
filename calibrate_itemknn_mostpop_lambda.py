@@ -78,7 +78,7 @@ def main():
 
             # Save results
             out_df = pd.DataFrame(rows)
-            save_dest = f"outputs/03_calibration/user_top10_{model_name.lower()}_calitune_{SCORE_TYPE}_lambda_{lam}.tsv"
+            save_dest = f"outputs/03_calibration/user_top10_{model_name.lower()}_calibrated_{SCORE_TYPE}_lambda_{lam}.tsv"
             out_df.to_csv(save_dest, sep="\t", index=False)
 
     print("Main model calibration loop finished.")

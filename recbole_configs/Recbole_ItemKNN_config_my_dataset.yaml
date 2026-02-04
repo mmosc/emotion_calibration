@@ -1,6 +1,6 @@
 model: 'ItemKNN'
 dataset: 'my_dataset'
-data_path: 'C:/Users/Emra/Desktop/PR/CaliTune/data'
+data_path: 'calibration/data'
 field_separator: "\t"
 
 seed: 920

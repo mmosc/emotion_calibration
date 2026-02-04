@@ -7,7 +7,7 @@ GEMS         = "data/id_highest_gems.tsv"
 MOST_POP_RECS = "outputs/02_base_recs/user_top100_mostpop.tsv"
 
 TOP_K = 10
-LAMBDAS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+LAMBDAS = [0.5]
 SCORE_TYPE = 'model' # options: 'rank', 'model'
 
 def main():
@@ -66,7 +66,7 @@ def main():
 
         # Save to file
         out_df = pd.DataFrame(results)
-        save_path = f"outputs/03_calibration/user_top10_mostpop_calitune_{SCORE_TYPE}_lambda_{lam}.tsv"
+        save_path = f"outputs/03_calibration/user_top10_mostpop_calibrated_{SCORE_TYPE}_lambda_{lam}.tsv"
         out_df.to_csv(save_path, sep="\t", index=False)
         print(f"File saved: {save_path}")
 
