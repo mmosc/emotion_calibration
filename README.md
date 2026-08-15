@@ -1,6 +1,6 @@
 # Emotion-calibrated Music Recommendation
 
-This repository contains the code for the paper Emotion-calibrated Music Recommendation, under review for UMAP'26.
+This repository contains the code for the paper Emotion-calibrated Music Recommendation, accepted at MuRS @ RecSys'26.
 
 The project analyzes a music catalog in terms of the GEMS [[1]](#1) emotion annotations provided with SRGNN-Emo [[2]](#2). It then applies calibration [[3]](#3) to the music recommendation, matching the distribution of emotions to the user's past listenings. The catalog used is extracted from the Music4All-Onion dataset [[4]](#4).
 
